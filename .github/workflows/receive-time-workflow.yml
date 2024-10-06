@@ -13,7 +13,11 @@ on:
         description: 'Minutes before time'
         required: false
         default: '0'
-
+        
+# Add this permissions block
+permissions:
+  contents: write
+  
 jobs:
   schedule-message:
     runs-on: ubuntu-latest
@@ -96,8 +100,8 @@ jobs:
             f.write(workflow_content)
         
         # Commit and push the new workflow file
-        os.system('git config --local user.email "action@github.com"')
-        os.system('git config --local user.name "GitHub Action"')
+        os.system('git config --local user.email "github-actions[bot]@users.noreply.github.com"')
+        os.system('git config --local user.name "github-actions[bot]"')
         os.system('git add .github/workflows/send_scheduled_telegram_message.yml')
         os.system('git commit -m "Add scheduled Telegram message workflow"')
         os.system('git push')
