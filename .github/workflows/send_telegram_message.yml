@@ -9,5 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Send Telegram message
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       run: |
-        curl -X GET "https://api.telegram.org/bot7539882862:AAFKE5inZILcaE7DYb1Vq85XUmjwRhTtyXE/sendMessage?chat_id=5616711824&text=${{ github.event.client_payload.message }}"
+        MESSAGE=$(echo "${{ github.event.client_payload.message }}" | jq -sRr @uri)
+        curl -X GET "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=5616711824&text=$MESSAGE"
