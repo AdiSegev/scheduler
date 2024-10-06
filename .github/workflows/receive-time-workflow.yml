@@ -1,4 +1,4 @@
-name: Receive Time and Schedule Telegram Message
+name: Receive and Schedule Message
 
 on:
   workflow_dispatch:
@@ -6,106 +6,57 @@ on:
       time:
         description: 'Time to send message (format: HH:MM AM/PM, e.g., 01:30 PM)'
         required: true
+        default: '12:00 PM'
       message:
         description: 'Message to send'
         required: true
-      minutes_before:
-        description: 'Minutes before time'
-        required: false
-        default: '0'
-        
-# Add this permissions block
-permissions:
-  contents: write
-  actions: write
-  
+        default: 'Default message'
+
 jobs:
   schedule-message:
     runs-on: ubuntu-latest
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v2
-
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
-
-    - name: Install dependencies
+    - name: Calculate schedule time
+      id: calculate-time
       run: |
-        python -m pip install --upgrade pip
-        pip install requests
-
-    - name: Calculate schedule time and create workflow
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        INPUT_TIME: ${{ github.event.inputs.time }}
-        INPUT_MESSAGE: ${{ github.event.inputs.message }}
-        MINUTES_BEFORE: ${{ github.event.inputs.minutes_before }}
-      run: |
-        python - << EOF
-        import os
+        python << EOF
         from datetime import datetime, timedelta
-        import requests
-        import urllib.parse
+        import os
 
         def parse_time(time_str):
             now = datetime.now()
-            try:
-                # Parse the time string
-                parsed_time = datetime.strptime(time_str, "%I:%M %p")
-                # Combine with today's date
-                return now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
-            except ValueError:
-                # If parsing fails, use current time + 1 hour
-                return now + timedelta(hours=1)
+            parsed_time = datetime.strptime(time_str, "%I:%M %p")
+            schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
+            if schedule_time <= now:
+                schedule_time += timedelta(days=1)
+            return schedule_time - timedelta(minutes=50)
 
-        # Parse the input time, use default if not provided
-        input_time_str = os.environ.get('INPUT_TIME') or '12:00 PM'
-        input_time = parse_time(input_time_str)
-        
-        # If the parsed time is in the past, add 1 day
-        if input_time < datetime.now():
-            input_time += timedelta(days=1)
-        
-        # Calculate the time 50 minutes earlier
-        schedule_time = input_time - timedelta(minutes=int( os.environ.get('MINUTES_BEFORE')))
-        
-        # Format the time for POSIX cron (GitHub Actions uses UTC)
-        cron_time = schedule_time.strftime('%M %H %d %m *')
-        input_time_str = os.environ.get('INPUT_TIME') or '12:00 PM'
-        message = os.environ.get('INPUT_MESSAGE') or 'Default message'
-           
-        # URL encode the message
-        encoded_message = urllib.parse.quote(message)
-        
-        # Create the workflow file content
-        workflow_content = f'''
-        name: Send Scheduled Telegram Message
-
-        on:
-          schedule:
-            - cron: '{cron_time}'
-
-        jobs:
-          send-message:
-            runs-on: ubuntu-latest
-            steps:
-            - name: Send Telegram message
-              run: |
-                curl -X GET "https://api.telegram.org/bot7539882862:AAFKE5inZILcaE7DYb1Vq85XUmjwRhTtyXE/sendMessage?chat_id=5616711824&text={encoded_message}"
-        '''
-        
-        # Save the workflow file
-        with open('.github/workflows/send_scheduled_telegram_message.yml', 'w') as f:
-            f.write(workflow_content)
-        
-        # Commit and push the new workflow file
-        os.system('git config --local user.email "github-actions[bot]@users.noreply.github.com"')
-        os.system('git config --local user.name "github-actions[bot]"')
-        os.system('git add .github/workflows/send_scheduled_telegram_message.yml')
-        os.system('git commit -m "Add scheduled Telegram message workflow"')
-        os.system('git push')
-        
-        print(f"Scheduled Telegram message to be sent at {schedule_time}")
+        input_time = '${{ github.event.inputs.time }}'
+        schedule_time = parse_time(input_time)
+        print(f"::set-output name=schedule_time::{schedule_time.isoformat()}")
         EOF
+
+    - name: Schedule repository dispatch
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        MESSAGE: ${{ github.event.inputs.message }}
+      run: |
+        schedule_time="${{ steps.calculate-time.outputs.schedule_time }}"
+        current_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        delay_seconds=$(( $(date -d "$schedule_time" +%s) - $(date -d "$current_time" +%s) ))
+        
+        if [ $delay_seconds -le 0 ]; then
+          echo "Scheduled time is in the past. Triggering immediately."
+          delay_seconds=0
+        fi
+        
+        echo "Scheduling message to be sent after $delay_seconds seconds"
+        
+        (sleep $delay_seconds && \
+        curl -X POST \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/dispatches \
+          -d '{"event_type": "send_telegram_message", "client_payload": {"message": "'"$MESSAGE"'"}}') &
+        
+        echo "Repository dispatch scheduled"
