@@ -24,7 +24,8 @@ jobs:
         import pytz
         
         def parse_time(time_str):
-            now = datetime.now(pytz.utc)
+            israel_tz = pytz.timezone('Asia/Jerusalem')
+            now = datetime.now(israel_tz)
             parsed_time = datetime.strptime(time_str, "%I:%M %p")
             schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
             if schedule_time < now:
@@ -42,10 +43,10 @@ jobs:
       run: |
         schedule_time="${{ steps.calculate-time.outputs.schedule_time }}"
         echo "Scheduled time: $schedule_time"
-        while [ "$(date -u +%Y-%m-%dT%H:%M:%S)" != "$(date -u -d "$schedule_time" +%Y-%m-%dT%H:%M:%S)" ]; do
+        while [ "$(date -u +%Y-%m-%dT%H:%M:%S%z)" != "$(date -u -d "$schedule_time" +%Y-%m-%dT%H:%M:%S%z)" ]; do
           sleep 1
-          current_time=$(date -u +%Y-%m-%dT%H:%M:%S)
-          echo "Current time (UTC): $current_time"
+          current_time=$(date +%Y-%m-%dT%H:%M:%S%z -d "$(TZ='Asia/Jerusalem' date)")
+          echo "Current time (Israel time): $current_time"
           if [ "$current_time" \> "$schedule_time" ]; then
             echo "Current time has surpassed scheduled time, breaking loop."
             break
