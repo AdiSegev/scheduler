@@ -55,12 +55,13 @@ jobs:
 
     - name: Trigger repository dispatch
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         MESSAGE: ${{ github.event.inputs.message }}
       run: |
         curl -X POST \
-          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
+          -H "Content-Type: application/json" \
           https://api.github.com/repos/${{ github.repository }}/dispatches \
           -d '{"event_type": "send_telegram_message", "client_payload": {"message": "'"$MESSAGE"'"}}'
         echo "Repository dispatch triggered"
