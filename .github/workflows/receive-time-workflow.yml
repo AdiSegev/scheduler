@@ -1,4 +1,4 @@
-name: Receive Time and Schedule Message
+name: Receive Time and Schedule Telegram Message
 
 on:
   workflow_dispatch:
@@ -30,6 +30,7 @@ jobs:
         import os
         from datetime import datetime, timedelta
         import requests
+        import urllib.parse
 
         # Parse the input time
         input_time = datetime.fromisoformat('${{ github.event.inputs.time }}')
@@ -40,9 +41,12 @@ jobs:
         # Format the time for POSIX cron (GitHub Actions uses UTC)
         cron_time = schedule_time.strftime('%M %H %d %m *')
         
+        # URL encode the message
+        encoded_message = urllib.parse.quote('${{ github.event.inputs.message }}')
+        
         # Create the workflow file content
         workflow_content = f'''
-        name: Send Scheduled Message
+        name: Send Scheduled Telegram Message
 
         on:
           schedule:
@@ -52,24 +56,21 @@ jobs:
           send-message:
             runs-on: ubuntu-latest
             steps:
-            - name: Send HTTP request
+            - name: Send Telegram message
               run: |
-                curl -X POST \\
-                     -H "Content-Type: application/json" \\
-                     -d '{{"message": "${{ github.event.inputs.message }}"}}' \\
-                     https://example.com/api/send-message  # Replace with your actual endpoint
+                curl -X GET "https://api.telegram.org/bot7539882862:AAFKE5inZILcaE7DYb1Vq85XUmjwRhTtyXE/sendMessage?chat_id=5616711824&text={encoded_message}"
         '''
         
         # Save the workflow file
-        with open('.github/workflows/send_scheduled_message.yml', 'w') as f:
+        with open('.github/workflows/send_scheduled_telegram_message.yml', 'w') as f:
             f.write(workflow_content)
         
         # Commit and push the new workflow file
         os.system('git config --local user.email "action@github.com"')
         os.system('git config --local user.name "GitHub Action"')
-        os.system('git add .github/workflows/send_scheduled_message.yml')
-        os.system('git commit -m "Add scheduled message workflow"')
+        os.system('git add .github/workflows/send_scheduled_telegram_message.yml')
+        os.system('git commit -m "Add scheduled Telegram message workflow"')
         os.system('git push')
         
-        print(f"Scheduled message to be sent at {schedule_time}")
+        print(f"Scheduled Telegram message to be sent at {schedule_time}")
         EOF
