@@ -36,27 +36,22 @@ jobs:
         print(f"::set-output name=schedule_time::{schedule_time}")
         EOF
 
-    - name: Schedule repository dispatch
+    - name: Wait until scheduled time
+      id: wait-until-time
+      run: |
+        schedule_time="${{ steps.calculate-time.outputs.schedule_time }}"
+        while [ "$(date -u +%Y-%m-%dT%H:%M:%SZ)" != "$(date -u -d "$schedule_time" +%Y-%m-%dT%H:%M:%SZ)" ]; do
+          sleep 1
+        done
+
+    - name: Trigger repository dispatch
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         MESSAGE: ${{ github.event.inputs.message }}
       run: |
-        schedule_time="${{ steps.calculate-time.outputs.schedule_time }}"
-        current_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        delay_seconds=$(( $(date -d "$schedule_time" +%s) - $(date -d "$current_time" +%s) ))
-        
-        if [ $delay_seconds -le 0 ]; then
-          echo "Scheduled time is in the past. Triggering immediately."
-          delay_seconds=0
-        fi
-        
-        echo "Scheduling message to be sent after $delay_seconds seconds"
-        
-        (sleep $delay_seconds && \
         curl -X POST \
           -H "Authorization: token $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com/repos/${{ github.repository }}/dispatches \
-          -d '{"event_type": "send_telegram_message", "client_payload": {"message": "'"$MESSAGE"'"}}') &
-        
-        echo "Repository dispatch scheduled"
+          -d '{"event_type": "send_telegram_message", "client_payload": {"message": "'"$MESSAGE"'"}}'
+        echo "Repository dispatch triggered"
