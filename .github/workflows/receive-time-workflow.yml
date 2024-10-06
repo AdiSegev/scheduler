@@ -31,7 +31,7 @@ jobs:
             if schedule_time < now:
                 # If the scheduled time is in the past, schedule it for the next day
                 schedule_time += timedelta(days=1)
-            return schedule_time
+            return schedule_time.astimezone(pytz.utc)
         
         time_str = "${{ github.event.inputs.time }}"
         schedule_time = parse_time(time_str)
@@ -42,7 +42,7 @@ jobs:
       id: wait-until-time
       run: |
         schedule_time="${{ steps.calculate-time.outputs.schedule_time }}"
-        echo "Scheduled time: $schedule_time"
+        echo "Scheduled time (UTC): $schedule_time"
         while true; do
           current_time=$(date -u +%Y-%m-%dT%H:%M:%S%z)
           echo "Current time (UTC): $current_time"
