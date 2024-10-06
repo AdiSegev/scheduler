@@ -1,0 +1,75 @@
+name: Receive Time and Schedule Message
+
+on:
+  workflow_dispatch:
+    inputs:
+      time:
+        description: 'Time to send message (ISO 8601 format)'
+        required: true
+      message:
+        description: 'Message to send'
+        required: true
+
+jobs:
+  schedule-message:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Calculate schedule time and create workflow
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python - << EOF
+        import os
+        from datetime import datetime, timedelta
+        import requests
+
+        # Parse the input time
+        input_time = datetime.fromisoformat('${{ github.event.inputs.time }}')
+        
+        # Calculate the time 50 minutes earlier
+        schedule_time = input_time - timedelta(minutes=50)
+        
+        # Format the time for POSIX cron (GitHub Actions uses UTC)
+        cron_time = schedule_time.strftime('%M %H %d %m *')
+        
+        # Create the workflow file content
+        workflow_content = f'''
+        name: Send Scheduled Message
+
+        on:
+          schedule:
+            - cron: '{cron_time}'
+
+        jobs:
+          send-message:
+            runs-on: ubuntu-latest
+            steps:
+            - name: Send HTTP request
+              run: |
+                curl -X POST \\
+                     -H "Content-Type: application/json" \\
+                     -d '{{"message": "${{ github.event.inputs.message }}"}}' \\
+                     https://example.com/api/send-message  # Replace with your actual endpoint
+        '''
+        
+        # Save the workflow file
+        with open('.github/workflows/send_scheduled_message.yml', 'w') as f:
+            f.write(workflow_content)
+        
+        # Commit and push the new workflow file
+        os.system('git config --local user.email "action@github.com"')
+        os.system('git config --local user.name "GitHub Action"')
+        os.system('git add .github/workflows/send_scheduled_message.yml')
+        os.system('git commit -m "Add scheduled message workflow"')
+        os.system('git push')
+        
+        print(f"Scheduled message to be sent at {schedule_time}")
+        EOF
