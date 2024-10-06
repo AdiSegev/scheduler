@@ -21,9 +21,10 @@ jobs:
       run: |
         python << EOF
         from datetime import datetime, timedelta
+        import pytz
         
         def parse_time(time_str):
-            now = datetime.now()
+            now = datetime.now(pytz.utc)
             parsed_time = datetime.strptime(time_str, "%I:%M %p")
             schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
             if schedule_time < now:
@@ -44,7 +45,7 @@ jobs:
         while [ "$(date -u +%Y-%m-%dT%H:%M:%S)" != "$(date -u -d "$schedule_time" +%Y-%m-%dT%H:%M:%S)" ]; do
           sleep 1
           current_time=$(date -u +%Y-%m-%dT%H:%M:%S)
-          echo "Current time: $current_time"
+          echo "Current time (UTC): $current_time"
           if [ "$current_time" \> "$schedule_time" ]; then
             echo "Current time has surpassed scheduled time, breaking loop."
             break
