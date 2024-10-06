@@ -1,0 +1,13 @@
+name: Send Telegram Message
+
+on:
+  repository_dispatch:
+    types: [send_telegram_message]
+
+jobs:
+  send-message:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Send Telegram message
+      run: |
+        curl -X GET "https://api.telegram.org/bot7539882862:AAFKE5inZILcaE7DYb1Vq85XUmjwRhTtyXE/sendMessage?chat_id=5616711824&text=${{ github.event.client_payload.message }}"
