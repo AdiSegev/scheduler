@@ -12,6 +12,10 @@ on:
         required: true
         default: 'Default message'
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   schedule-message:
     runs-on: ubuntu-latest
@@ -55,7 +59,7 @@ jobs:
 
     - name: Trigger repository dispatch
       env:
-        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         MESSAGE: ${{ github.event.inputs.message }}
       run: |
         curl -X POST \
