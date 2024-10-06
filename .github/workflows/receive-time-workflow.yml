@@ -17,6 +17,7 @@ on:
 # Add this permissions block
 permissions:
   contents: write
+  actions: write
   
 jobs:
   schedule-message:
