@@ -34,6 +34,9 @@ jobs:
     - name: Calculate schedule time and create workflow
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        INPUT_TIME: ${{ github.event.inputs.time }}
+        INPUT_MESSAGE: ${{ github.event.inputs.message }}
+        MINUTES_BEFORE: ${{ github.event.inputs.minutes_before }}
       run: |
         python - << EOF
         import os
@@ -53,7 +56,7 @@ jobs:
                 return now + timedelta(hours=1)
 
         # Parse the input time, use default if not provided
-        input_time_str = '${{ github.event.inputs.time }}' or '12:00 PM'
+        input_time_str = os.environ.get('INPUT_TIME') or '12:00 PM'
         input_time = parse_time(input_time_str)
         
         # If the parsed time is in the past, add 1 day
@@ -61,13 +64,15 @@ jobs:
             input_time += timedelta(days=1)
         
         # Calculate the time 50 minutes earlier
-        schedule_time = input_time - timedelta(minutes=int( github.event.inputs.minutes_before))
+        schedule_time = input_time - timedelta(minutes=int( os.environ.get('MINUTES_BEFORE')))
         
         # Format the time for POSIX cron (GitHub Actions uses UTC)
         cron_time = schedule_time.strftime('%M %H %d %m *')
-        
+        input_time_str = os.environ.get('INPUT_TIME') or '12:00 PM'
+        message = os.environ.get('INPUT_MESSAGE') or 'Default message'
+           
         # URL encode the message
-        encoded_message = urllib.parse.quote('${{ github.event.inputs.message }}')
+        encoded_message = urllib.parse.quote(message)
         
         # Create the workflow file content
         workflow_content = f'''
