@@ -28,7 +28,7 @@ jobs:
             parsed_time = datetime.strptime(time_str, "%I:%M %p")
             schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
 
-return schedule_time
+schedule_time
 
             
         
