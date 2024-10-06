@@ -37,7 +37,7 @@ jobs:
         # Convert to UTC
         schedule_time_utc = schedule_time.astimezone(datetime.utcnow().tzinfo)
         print(f"::set-output name=schedule_time::{schedule_time_utc.isoformat()}")
-        echo "schedule_time_utc $schedule_time_utc"
+        
         EOF
 
     - name: Schedule repository dispatch
