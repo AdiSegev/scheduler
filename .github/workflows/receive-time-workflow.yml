@@ -9,6 +9,10 @@ on:
       message:
         description: 'Message to send'
         required: true
+      minutes_before:
+        description: 'Minutes before time'
+        required: false
+        default: '0'
 
 jobs:
   schedule-message:
@@ -39,9 +43,9 @@ jobs:
 
         # Parse the input time
         input_time = datetime.fromisoformat('${{ github.event.inputs.time }}')
-        
+              
         # Calculate the time 50 minutes earlier
-        schedule_time = input_time - timedelta(minutes=50)
+        schedule_time = input_time - timedelta(minutes=int(github.event.inputs.minutes_before))
         
         # Format the time for POSIX cron (GitHub Actions uses UTC)
         cron_time = schedule_time.strftime('%M %H %d %m *')
