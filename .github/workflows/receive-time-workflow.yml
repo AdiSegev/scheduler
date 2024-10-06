@@ -27,12 +27,17 @@ jobs:
             now = datetime.now()
             parsed_time = datetime.strptime(time_str, "%I:%M %p")
             schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
+            
             if schedule_time <= now:
                 schedule_time += timedelta(days=1)
             return schedule_time - timedelta(minutes=1)
 
         input_time = '${{ github.event.inputs.time }}'
         schedule_time = parse_time(input_time)
+        schedule_time_utc = schedule_time.astimezone(datetime.utcnow().tzinfo)
+        
+        print(f"::set-output name=schedule_time::{schedule_time_utc.isoformat()}")
+        
         print(f"::set-output name=schedule_time::{schedule_time.isoformat()}")
         EOF
 
