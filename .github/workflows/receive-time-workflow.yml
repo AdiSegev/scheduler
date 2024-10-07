@@ -17,7 +17,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        ISSUE_NUMBER=123  # Replace with your specific issue number
+        ISSUE_NUMBER=1  # Replace with your specific issue number
         if [ "${{ github.event.issue.number }}" = "$ISSUE_NUMBER" ]; then
           echo "::set-output name=is_target_issue::true"
           echo "::set-output name=comment_body::${{ github.event.comment.body }}"
@@ -51,8 +51,7 @@ jobs:
             now = datetime.now(israel_tz)
             parsed_time = datetime.strptime(time_str, "%I:%M %p")
             schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
-            if schedule_time < now:
-                schedule_time += timedelta(days=1)
+
             trigger_time = schedule_time - timedelta(minutes=minutes_before)
             return schedule_time, trigger_time
         
