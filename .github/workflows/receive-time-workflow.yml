@@ -1,27 +1,45 @@
-name: Receive and Schedule Message
+name: Receive and Schedule Message from Comment
+
 on:
-  workflow_dispatch:
-    inputs:
-      time:
-        description: 'Time to send message (format: HH:MM AM/PM, e.g., 01:30 PM)'
-        required: true
-        default: '12:00 PM'
-      message:
-        description: 'Message to send'
-        required: true
-        default: 'Default message'
-      minutes_before:
-        description: 'Minutes before scheduled time to trigger the action'
-        required: true
-        default: '0'
+  issue_comment:
+    types: [created, edited]
+
 permissions:
   contents: write
   actions: write
+
 jobs:
-  schedule-message:
+  process-comment:
     runs-on: ubuntu-latest
     steps:
+    - name: Check if comment is on the specified issue
+      id: check-comment
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        ISSUE_NUMBER=123  # Replace with your specific issue number
+        if [ "${{ github.event.issue.number }}" = "$ISSUE_NUMBER" ]; then
+          echo "::set-output name=is_target_issue::true"
+          echo "::set-output name=comment_body::${{ github.event.comment.body }}"
+        else
+          echo "::set-output name=is_target_issue::false"
+        fi
+
+    - name: Parse comment and schedule message
+      if: steps.check-comment.outputs.is_target_issue == 'true'
+      id: parse-comment
+      run: |
+        COMMENT_BODY="${{ steps.check-comment.outputs.comment_body }}"
+        TIME=$(echo "$COMMENT_BODY" | sed -n '1p')
+        MESSAGE=$(echo "$COMMENT_BODY" | sed -n '2p')
+        MINUTES_BEFORE=$(echo "$COMMENT_BODY" | sed -n '3p')
+        
+        echo "::set-output name=time::$TIME"
+        echo "::set-output name=message::$MESSAGE"
+        echo "::set-output name=minutes_before::$MINUTES_BEFORE"
+
     - name: Calculate schedule time
+      if: steps.check-comment.outputs.is_target_issue == 'true'
       id: calculate-time
       run: |
         python << EOF
@@ -33,18 +51,20 @@ jobs:
             now = datetime.now(israel_tz)
             parsed_time = datetime.strptime(time_str, "%I:%M %p")
             schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
-
-            # Subtract minutes_before from the schedule_time
+            if schedule_time < now:
+                schedule_time += timedelta(days=1)
             trigger_time = schedule_time - timedelta(minutes=minutes_before)
             return schedule_time, trigger_time
         
-        time_str = "${{ github.event.inputs.time }}"
-        minutes_before = int("${{ github.event.inputs.minutes_before }}")
+        time_str = "${{ steps.parse-comment.outputs.time }}"
+        minutes_before = int("${{ steps.parse-comment.outputs.minutes_before }}")
         schedule_time, trigger_time = parse_time(time_str, minutes_before)
         print(f"::set-output name=schedule_time::{schedule_time.isoformat()}")
         print(f"::set-output name=trigger_time::{trigger_time.isoformat()}")
         EOF
+
     - name: Wait until trigger time
+      if: steps.check-comment.outputs.is_target_issue == 'true'
       id: wait-until-time
       env:
         TZ: Asia/Jerusalem
@@ -62,10 +82,12 @@ jobs:
           fi
           sleep 60
         done
+
     - name: Trigger repository dispatch
+      if: steps.check-comment.outputs.is_target_issue == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        MESSAGE: ${{ github.event.inputs.message }}
+        MESSAGE: ${{ steps.parse-comment.outputs.message }}
       run: |
         curl -X POST \
           -H "Authorization: Bearer $GITHUB_TOKEN" \
