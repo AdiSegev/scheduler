@@ -1,5 +1,4 @@
 name: Receive and Schedule Message
-
 on:
   workflow_dispatch:
     inputs:
@@ -11,11 +10,9 @@ on:
         description: 'Message to send'
         required: true
         default: 'Default message'
-
 permissions:
   contents: write
   actions: write
-
 jobs:
   schedule-message:
     runs-on: ubuntu-latest
@@ -35,28 +32,28 @@ jobs:
             if schedule_time < now:
                 # If the scheduled time is in the past, schedule it for the next day
                 schedule_time += timedelta(days=1)
-            return schedule_time.astimezone(pytz.utc)
+            return schedule_time
         
         time_str = "${{ github.event.inputs.time }}"
         schedule_time = parse_time(time_str)
         print(f"::set-output name=schedule_time::{schedule_time.isoformat()}")
         EOF
-
     - name: Wait until scheduled time
       id: wait-until-time
+      env:
+        TZ: Asia/Jerusalem
       run: |
         schedule_time="${{ steps.calculate-time.outputs.schedule_time }}"
-        echo "Scheduled time (UTC): $schedule_time"
+        echo "Scheduled time (Israel): $schedule_time"
         while true; do
-          current_time=$(date -u +%Y-%m-%dT%H:%M:%S%z)
-          echo "Current time (UTC): $current_time"
+          current_time=$(date +"%Y-%m-%dT%H:%M:%S%z")
+          echo "Current time (Israel): $current_time"
           if [ "$current_time" \> "$schedule_time" ]; then
             echo "Current time has surpassed scheduled time, breaking loop."
             break
           fi
-          sleep 1
+          sleep 60
         done
-
     - name: Trigger repository dispatch
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
