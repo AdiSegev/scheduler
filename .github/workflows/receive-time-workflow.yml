@@ -17,7 +17,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        ISSUE_NUMBER=1  # Replace with your specific issue number
+        ISSUE_NUMBER=123  # Replace with your specific issue number
         if [ "${{ github.event.issue.number }}" = "$ISSUE_NUMBER" ]; then
           echo "is_target_issue=true" >> $GITHUB_OUTPUT
           echo "comment_body<<EOF" >> $GITHUB_OUTPUT
@@ -32,27 +32,29 @@ jobs:
       id: parse-comment
       run: |
         COMMENT_BODY="${{ steps.check-comment.outputs.comment_body }}"
-        python3 << EOFparse
-        import re
-        import sys
+        python3 - <<EOF
+import re
+import sys
+import os
 
-        comment = """$COMMENT_BODY"""
+comment = """$COMMENT_BODY"""
 
-        # Use regex to find the time, message, and minutes
-        time_match = re.search(r'(\d{1,2}:\d{2} [AP]M)', comment)
-        message_match = re.search(r'(?<=\d{1,2}:\d{2} [AP]M\n)(.+?)(?=\n\d+|$)', comment, re.DOTALL)
-        minutes_match = re.search(r'(\d+)\s*$', comment)
+# Use regex to find the time, message, and minutes
+time_match = re.search(r'(\d{1,2}:\d{2} [AP]M)', comment)
+message_match = re.search(r'(?<=\d{1,2}:\d{2} [AP]M\n)(.+?)(?=\n\d+|$)', comment, re.DOTALL)
+minutes_match = re.search(r'(\d+)\s*$', comment)
 
-        if time_match and message_match and minutes_match:
-            print(f"time={time_match.group(1)}")
-            print(f"message<<EOF")
-            print(f"{message_match.group(1).strip()}")
-            print("EOF")
-            print(f"minutes_before={minutes_match.group(1)}")
-        else:
-            print("Error: Could not parse all required fields from the comment.", file=sys.stderr)
-            sys.exit(1)
-        EOFparse >> $GITHUB_OUTPUT
+if time_match and message_match and minutes_match:
+    with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+        print(f"time={time_match.group(1)}", file=fh)
+        print("message<<EOF", file=fh)
+        print(f"{message_match.group(1).strip()}", file=fh)
+        print("EOF", file=fh)
+        print(f"minutes_before={minutes_match.group(1)}", file=fh)
+else:
+    print("Error: Could not parse all required fields from the comment.", file=sys.stderr)
+    sys.exit(1)
+EOF
 
     - name: Debug output
       if: steps.check-comment.outputs.is_target_issue == 'true'
@@ -65,31 +67,34 @@ jobs:
       if: steps.check-comment.outputs.is_target_issue == 'true'
       id: calculate-time
       run: |
-        python3 << EOFcalc
-        from datetime import datetime, timedelta
-        import pytz
-        import sys
+        python3 - <<EOF
+from datetime import datetime, timedelta
+import pytz
+import sys
+import os
 
-        def parse_time(time_str, minutes_before):
-            try:
-                israel_tz = pytz.timezone('Asia/Jerusalem')
-                now = datetime.now(israel_tz)
-                parsed_time = datetime.strptime(time_str, "%I:%M %p")
-                schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
-                if schedule_time < now:
-                    schedule_time += timedelta(days=1)
-                trigger_time = schedule_time - timedelta(minutes=int(minutes_before))
-                return schedule_time, trigger_time
-            except ValueError as e:
-                print(f"Error parsing time or minutes: {e}", file=sys.stderr)
-                sys.exit(1)
+def parse_time(time_str, minutes_before):
+    try:
+        israel_tz = pytz.timezone('Asia/Jerusalem')
+        now = datetime.now(israel_tz)
+        parsed_time = datetime.strptime(time_str, "%I:%M %p")
+        schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
+        if schedule_time < now:
+            schedule_time += timedelta(days=1)
+        trigger_time = schedule_time - timedelta(minutes=int(minutes_before))
+        return schedule_time, trigger_time
+    except ValueError as e:
+        print(f"Error parsing time or minutes: {e}", file=sys.stderr)
+        sys.exit(1)
 
-        time_str = "${{ steps.parse-comment.outputs.time }}"
-        minutes_before = "${{ steps.parse-comment.outputs.minutes_before }}"
-        schedule_time, trigger_time = parse_time(time_str, minutes_before)
-        print(f"schedule_time={schedule_time.isoformat()}")
-        print(f"trigger_time={trigger_time.isoformat()}")
-        EOFcalc >> $GITHUB_OUTPUT
+time_str = "${{ steps.parse-comment.outputs.time }}"
+minutes_before = "${{ steps.parse-comment.outputs.minutes_before }}"
+schedule_time, trigger_time = parse_time(time_str, minutes_before)
+
+with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+    print(f"schedule_time={schedule_time.isoformat()}", file=fh)
+    print(f"trigger_time={trigger_time.isoformat()}", file=fh)
+EOF
 
     - name: Wait until trigger time
       if: steps.check-comment.outputs.is_target_issue == 'true'
