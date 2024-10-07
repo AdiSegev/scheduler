@@ -52,7 +52,7 @@ jobs:
             echo "Current time has surpassed scheduled time, breaking loop."
             break
           fi
-          sleep 60
+          sleep 1
         done
     - name: Trigger repository dispatch
       env:
