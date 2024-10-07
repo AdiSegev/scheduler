@@ -17,7 +17,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ISSUE_NUMBER=123  # Replace with your specific issue number
+          ISSUE_NUMBER=1  # Replace with your specific issue number
           if [ "${{ github.event.issue.number }}" = "$ISSUE_NUMBER" ]; then
             echo "is_target_issue=true" >> $GITHUB_OUTPUT
             echo "comment_body<<EOF" >> $GITHUB_OUTPUT
