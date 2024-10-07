@@ -28,7 +28,7 @@ jobs:
             israel_tz = pytz.timezone('Asia/Jerusalem')
             now = datetime.now(israel_tz)
             parsed_time = datetime.strptime(time_str, "%I:%M %p")
-            schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
+            return now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
 
         
         time_str = "${{ github.event.inputs.time }}"
