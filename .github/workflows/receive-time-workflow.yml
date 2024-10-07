@@ -12,120 +12,120 @@ jobs:
   process-comment:
     runs-on: ubuntu-latest
     steps:
-    - name: Check if comment is on the specified issue
-      id: check-comment
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        ISSUE_NUMBER=123  # Replace with your specific issue number
-        if [ "${{ github.event.issue.number }}" = "$ISSUE_NUMBER" ]; then
-          echo "is_target_issue=true" >> $GITHUB_OUTPUT
-          echo "comment_body<<EOF" >> $GITHUB_OUTPUT
-          echo "${{ github.event.comment.body }}" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        else
-          echo "is_target_issue=false" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Parse comment and schedule message
-      if: steps.check-comment.outputs.is_target_issue == 'true'
-      id: parse-comment
-      run: |
-        COMMENT_BODY="${{ steps.check-comment.outputs.comment_body }}"
-        python3 - <<EOF
-import re
-import sys
-import os
-
-comment = """$COMMENT_BODY"""
-
-# Use regex to find the time, message, and minutes
-time_match = re.search(r'(\d{1,2}:\d{2} [AP]M)', comment)
-message_match = re.search(r'(?<=\d{1,2}:\d{2} [AP]M\n)(.+?)(?=\n\d+|$)', comment, re.DOTALL)
-minutes_match = re.search(r'(\d+)\s*$', comment)
-
-if time_match and message_match and minutes_match:
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
-        print(f"time={time_match.group(1)}", file=fh)
-        print("message<<EOF", file=fh)
-        print(f"{message_match.group(1).strip()}", file=fh)
-        print("EOF", file=fh)
-        print(f"minutes_before={minutes_match.group(1)}", file=fh)
-else:
-    print("Error: Could not parse all required fields from the comment.", file=sys.stderr)
-    sys.exit(1)
-EOF
-
-    - name: Debug output
-      if: steps.check-comment.outputs.is_target_issue == 'true'
-      run: |
-        echo "Time: ${{ steps.parse-comment.outputs.time }}"
-        echo "Message: ${{ steps.parse-comment.outputs.message }}"
-        echo "Minutes Before: ${{ steps.parse-comment.outputs.minutes_before }}"
-
-    - name: Calculate schedule time
-      if: steps.check-comment.outputs.is_target_issue == 'true'
-      id: calculate-time
-      run: |
-        python3 - <<EOF
-from datetime import datetime, timedelta
-import pytz
-import sys
-import os
-
-def parse_time(time_str, minutes_before):
-    try:
-        israel_tz = pytz.timezone('Asia/Jerusalem')
-        now = datetime.now(israel_tz)
-        parsed_time = datetime.strptime(time_str, "%I:%M %p")
-        schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
-        if schedule_time < now:
-            schedule_time += timedelta(days=1)
-        trigger_time = schedule_time - timedelta(minutes=int(minutes_before))
-        return schedule_time, trigger_time
-    except ValueError as e:
-        print(f"Error parsing time or minutes: {e}", file=sys.stderr)
-        sys.exit(1)
-
-time_str = "${{ steps.parse-comment.outputs.time }}"
-minutes_before = "${{ steps.parse-comment.outputs.minutes_before }}"
-schedule_time, trigger_time = parse_time(time_str, minutes_before)
-
-with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
-    print(f"schedule_time={schedule_time.isoformat()}", file=fh)
-    print(f"trigger_time={trigger_time.isoformat()}", file=fh)
-EOF
-
-    - name: Wait until trigger time
-      if: steps.check-comment.outputs.is_target_issue == 'true'
-      id: wait-until-time
-      env:
-        TZ: Asia/Jerusalem
-      run: |
-        schedule_time="${{ steps.calculate-time.outputs.schedule_time }}"
-        trigger_time="${{ steps.calculate-time.outputs.trigger_time }}"
-        echo "Scheduled time (Israel): $schedule_time"
-        echo "Trigger time (Israel): $trigger_time"
-        while true; do
-          current_time=$(date -Iseconds)
-          echo "Current time (Israel): $current_time"
-          if [[ "$current_time" > "$trigger_time" ]]; then
-            echo "Current time has surpassed trigger time, breaking loop."
-            break
+      - name: Check if comment is on the specified issue
+        id: check-comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUMBER=123  # Replace with your specific issue number
+          if [ "${{ github.event.issue.number }}" = "$ISSUE_NUMBER" ]; then
+            echo "is_target_issue=true" >> $GITHUB_OUTPUT
+            echo "comment_body<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ github.event.comment.body }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "is_target_issue=false" >> $GITHUB_OUTPUT
           fi
-          sleep 60
-        done
 
-    - name: Trigger repository dispatch
-      if: steps.check-comment.outputs.is_target_issue == 'true'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        MESSAGE: ${{ steps.parse-comment.outputs.message }}
-      run: |
-        curl -X POST \
-          -H "Authorization: Bearer $GITHUB_TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
-          -H "Content-Type: application/json" \
-          https://api.github.com/repos/${{ github.repository }}/dispatches \
-          -d '{"event_type": "send_telegram_message", "client_payload": {"message": "'"$MESSAGE"'"}}'
-        echo "Repository dispatch triggered"
+      - name: Parse comment and schedule message
+        if: steps.check-comment.outputs.is_target_issue == 'true'
+        id: parse-comment
+        run: |
+          COMMENT_BODY="${{ steps.check-comment.outputs.comment_body }}"
+          python3 - <<EOF
+          import re
+          import sys
+          import os
+
+          comment = """$COMMENT_BODY"""
+
+          # Use regex to find the time, message, and minutes
+          time_match = re.search(r'(\d{1,2}:\d{2} [AP]M)', comment)
+          message_match = re.search(r'(?<=\d{1,2}:\d{2} [AP]M\n)(.+?)(?=\n\d+|$)', comment, re.DOTALL)
+          minutes_match = re.search(r'(\d+)\s*$', comment)
+
+          if time_match and message_match and minutes_match:
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+                  print(f"time={time_match.group(1)}", file=fh)
+                  print("message<<EOF", file=fh)
+                  print(f"{message_match.group(1).strip()}", file=fh)
+                  print("EOF", file=fh)
+                  print(f"minutes_before={minutes_match.group(1)}", file=fh)
+          else:
+              print("Error: Could not parse all required fields from the comment.", file=sys.stderr)
+              sys.exit(1)
+          EOF
+
+      - name: Debug output
+        if: steps.check-comment.outputs.is_target_issue == 'true'
+        run: |
+          echo "Time: ${{ steps.parse-comment.outputs.time }}"
+          echo "Message: ${{ steps.parse-comment.outputs.message }}"
+          echo "Minutes Before: ${{ steps.parse-comment.outputs.minutes_before }}"
+
+      - name: Calculate schedule time
+        if: steps.check-comment.outputs.is_target_issue == 'true'
+        id: calculate-time
+        run: |
+          python3 - <<EOF
+          from datetime import datetime, timedelta
+          import pytz
+          import sys
+          import os
+
+          def parse_time(time_str, minutes_before):
+              try:
+                  israel_tz = pytz.timezone('Asia/Jerusalem')
+                  now = datetime.now(israel_tz)
+                  parsed_time = datetime.strptime(time_str, "%I:%M %p")
+                  schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
+                  if schedule_time < now:
+                      schedule_time += timedelta(days=1)
+                  trigger_time = schedule_time - timedelta(minutes=int(minutes_before))
+                  return schedule_time, trigger_time
+              except ValueError as e:
+                  print(f"Error parsing time or minutes: {e}", file=sys.stderr)
+                  sys.exit(1)
+
+          time_str = "${{ steps.parse-comment.outputs.time }}"
+          minutes_before = "${{ steps.parse-comment.outputs.minutes_before }}"
+          schedule_time, trigger_time = parse_time(time_str, minutes_before)
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+              print(f"schedule_time={schedule_time.isoformat()}", file=fh)
+              print(f"trigger_time={trigger_time.isoformat()}", file=fh)
+          EOF
+
+      - name: Wait until trigger time
+        if: steps.check-comment.outputs.is_target_issue == 'true'
+        id: wait-until-time
+        env:
+          TZ: Asia/Jerusalem
+        run: |
+          schedule_time="${{ steps.calculate-time.outputs.schedule_time }}"
+          trigger_time="${{ steps.calculate-time.outputs.trigger_time }}"
+          echo "Scheduled time (Israel): $schedule_time"
+          echo "Trigger time (Israel): $trigger_time"
+          while true; do
+            current_time=$(date -Iseconds)
+            echo "Current time (Israel): $current_time"
+            if [[ "$current_time" > "$trigger_time" ]]; then
+              echo "Current time has surpassed trigger time, breaking loop."
+              break
+            fi
+            sleep 60
+          done
+
+      - name: Trigger repository dispatch
+        if: steps.check-comment.outputs.is_target_issue == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MESSAGE: ${{ steps.parse-comment.outputs.message }}
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            https://api.github.com/repos/${{ github.repository }}/dispatches \
+            -d '{"event_type": "send_telegram_message", "client_payload": {"message": "'"$MESSAGE"'"}}'
+          echo "Repository dispatch triggered"
