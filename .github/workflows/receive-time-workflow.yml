@@ -40,17 +40,20 @@ jobs:
           comment = """$COMMENT_BODY"""
 
           # Use regex to find the time, message, and minutes
-          time_match = re.search(r'(\d{1,2}:\d{2} [AP]M)', comment)
-          message_match = re.search(r'(?<=\d{1,2}:\d{2} [AP]M\n)(.+?)(?=\n\d+|$)', comment, re.DOTALL)
-          minutes_match = re.search(r'(\d+)\s*$', comment)
+          pattern = r'(\d{1,2}:\d{2} [AP]M)\n([\s\S]*)\n(\d+)\s*$'
+          match = re.search(pattern, comment, re.MULTILINE)
 
-          if time_match and message_match and minutes_match:
+          if match:
+              time = match.group(1)
+              message = match.group(2).strip()
+              minutes_before = match.group(3)
+              
               with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
-                  print(f"time={time_match.group(1)}", file=fh)
+                  print(f"time={time}", file=fh)
                   print("message<<EOF", file=fh)
-                  print(f"{message_match.group(1).strip()}", file=fh)
+                  print(message, file=fh)
                   print("EOF", file=fh)
-                  print(f"minutes_before={minutes_match.group(1)}", file=fh)
+                  print(f"minutes_before={minutes_before}", file=fh)
           else:
               print("Error: Could not parse all required fields from the comment.", file=sys.stderr)
               sys.exit(1)
