@@ -115,7 +115,7 @@ jobs:
               echo "Current time has surpassed trigger time, breaking loop."
               break
             fi
-            sleep 1
+            sleep 60
           done
 
 
