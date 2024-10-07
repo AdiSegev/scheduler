@@ -33,9 +33,7 @@ jobs:
             now = datetime.now(israel_tz)
             parsed_time = datetime.strptime(time_str, "%I:%M %p")
             schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
-            if schedule_time < now:
-                # If the scheduled time is in the past, schedule it for the next day
-                schedule_time += timedelta(days=1)
+
             # Subtract minutes_before from the schedule_time
             trigger_time = schedule_time - timedelta(minutes=minutes_before)
             return schedule_time, trigger_time
