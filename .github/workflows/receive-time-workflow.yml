@@ -10,6 +10,10 @@ on:
         description: 'Message to send'
         required: true
         default: 'Default message'
+      minutes_before:
+        description: 'Minutes before scheduled time to trigger the action'
+        required: true
+        default: '0'
 permissions:
   contents: write
   actions: write
@@ -24,32 +28,41 @@ jobs:
         from datetime import datetime, timedelta
         import pytz
         
-        def parse_time(time_str):
+        def parse_time(time_str, minutes_before):
             israel_tz = pytz.timezone('Asia/Jerusalem')
             now = datetime.now(israel_tz)
             parsed_time = datetime.strptime(time_str, "%I:%M %p")
-            return now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
-
+            schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
+            if schedule_time < now:
+                # If the scheduled time is in the past, schedule it for the next day
+                schedule_time += timedelta(days=1)
+            # Subtract minutes_before from the schedule_time
+            trigger_time = schedule_time - timedelta(minutes=minutes_before)
+            return schedule_time, trigger_time
         
         time_str = "${{ github.event.inputs.time }}"
-        schedule_time = parse_time(time_str)
+        minutes_before = int("${{ github.event.inputs.minutes_before }}")
+        schedule_time, trigger_time = parse_time(time_str, minutes_before)
         print(f"::set-output name=schedule_time::{schedule_time.isoformat()}")
+        print(f"::set-output name=trigger_time::{trigger_time.isoformat()}")
         EOF
-    - name: Wait until scheduled time
+    - name: Wait until trigger time
       id: wait-until-time
       env:
         TZ: Asia/Jerusalem
       run: |
         schedule_time="${{ steps.calculate-time.outputs.schedule_time }}"
+        trigger_time="${{ steps.calculate-time.outputs.trigger_time }}"
         echo "Scheduled time (Israel): $schedule_time"
+        echo "Trigger time (Israel): $trigger_time"
         while true; do
           current_time=$(date +"%Y-%m-%dT%H:%M:%S%z")
           echo "Current time (Israel): $current_time"
-          if [ "$current_time" \> "$schedule_time" ]; then
-            echo "Current time has surpassed scheduled time, breaking loop."
+          if [ "$current_time" \> "$trigger_time" ]; then
+            echo "Current time has surpassed trigger time, breaking loop."
             break
           fi
-          sleep 1
+          sleep 60
         done
     - name: Trigger repository dispatch
       env:
