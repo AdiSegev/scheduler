@@ -29,10 +29,7 @@ jobs:
             now = datetime.now(israel_tz)
             parsed_time = datetime.strptime(time_str, "%I:%M %p")
             schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
-            if schedule_time < now:
-                # If the scheduled time is in the past, schedule it for the next day
-                schedule_time += timedelta(days=1)
-            return schedule_time
+
         
         time_str = "${{ github.event.inputs.time }}"
         schedule_time = parse_time(time_str)
