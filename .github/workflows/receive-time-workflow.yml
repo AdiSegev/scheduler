@@ -40,7 +40,7 @@ jobs:
           comment = """$COMMENT_BODY"""
 
           # Use regex to find the time, message, and minutes
-          pattern = r'(\d{1,2}:\d{2} [AP]M)\n([\s\S]*)\n(\d+)\s*$'
+          pattern = r'(\d{1,2}:\d{2}:\d{2} [AP]M)\n([\s\S]*)\n(\d+)\s*$'
           match = re.search(pattern, comment, re.MULTILINE)
 
           if match:
@@ -80,8 +80,8 @@ jobs:
               try:
                   israel_tz = pytz.timezone('Asia/Jerusalem')
                   now = datetime.now(israel_tz)
-                  parsed_time = datetime.strptime(time_str, "%I:%M %p")
-                  schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
+                  parsed_time = datetime.strptime(time_str, "%I:%M:%S %p")
+                  schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=parsed_time.second, microsecond=0)
 
                   trigger_time = schedule_time - timedelta(minutes=int(minutes_before))
                   return schedule_time, trigger_time
