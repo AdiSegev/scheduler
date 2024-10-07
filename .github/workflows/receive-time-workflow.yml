@@ -63,30 +63,62 @@ EOF
       if: steps.check-comment.outputs.is_target_issue == 'true'
       id: calculate-time
       run: |
-        python << EOF
-        from datetime import datetime, timedelta
-        import pytz
-        import sys
-        
-        def parse_time(time_str, minutes_before):
-            try:
-                israel_tz = pytz.timezone('Asia/Jerusalem')
-                now = datetime.now(israel_tz)
-                parsed_time = datetime.strptime(time_str, "%I:%M %p")
-                schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
-                if schedule_time < now:
-                    schedule_time += timedelta(days=1)
-                trigger_time = schedule_time - timedelta(minutes=int(minutes_before))
-                return schedule_time, trigger_time
-            except ValueError as e:
-                print(f"Error parsing time or minutes: {e}", file=sys.stderr)
-                sys.exit(1)
-        
-        time_str = "${{ steps.parse-comment.outputs.time }}"
-        minutes_before = "${{ steps.parse-comment.outputs.minutes_before }}"
-        schedule_time, trigger_time = parse_time(time_str, minutes_before)
-        print(f"::set-output name=schedule_time::{schedule_time.isoformat()}")
-        print(f"::set-output name=trigger_time::{trigger_time.isoformat()}")
-        EOF
+        python3 << EOF
+from datetime import datetime, timedelta
+import pytz
+import sys
 
-    # ... rest of the workflow remains the same
+def parse_time(time_str, minutes_before):
+    try:
+        israel_tz = pytz.timezone('Asia/Jerusalem')
+        now = datetime.now(israel_tz)
+        parsed_time = datetime.strptime(time_str, "%I:%M %p")
+        schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
+        if schedule_time < now:
+            schedule_time += timedelta(days=1)
+        trigger_time = schedule_time - timedelta(minutes=int(minutes_before))
+        return schedule_time, trigger_time
+    except ValueError as e:
+        print(f"Error parsing time or minutes: {e}", file=sys.stderr)
+        sys.exit(1)
+
+time_str = "${{ steps.parse-comment.outputs.time }}"
+minutes_before = "${{ steps.parse-comment.outputs.minutes_before }}"
+schedule_time, trigger_time = parse_time(time_str, minutes_before)
+print(f"::set-output name=schedule_time::{schedule_time.isoformat()}")
+print(f"::set-output name=trigger_time::{trigger_time.isoformat()}")
+EOF
+
+    - name: Wait until trigger time
+      if: steps.check-comment.outputs.is_target_issue == 'true'
+      id: wait-until-time
+      env:
+        TZ: Asia/Jerusalem
+      run: |
+        schedule_time="${{ steps.calculate-time.outputs.schedule_time }}"
+        trigger_time="${{ steps.calculate-time.outputs.trigger_time }}"
+        echo "Scheduled time (Israel): $schedule_time"
+        echo "Trigger time (Israel): $trigger_time"
+        while true; do
+          current_time=$(date -Iseconds)
+          echo "Current time (Israel): $current_time"
+          if [[ "$current_time" > "$trigger_time" ]]; then
+            echo "Current time has surpassed trigger time, breaking loop."
+            break
+          fi
+          sleep 60
+        done
+
+    - name: Trigger repository dispatch
+      if: steps.check-comment.outputs.is_target_issue == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        MESSAGE: ${{ steps.parse-comment.outputs.message }}
+      run: |
+        curl -X POST \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Content-Type: application/json" \
+          https://api.github.com/repos/${{ github.repository }}/dispatches \
+          -d '{"event_type": "send_telegram_message", "client_payload": {"message": "'"$MESSAGE"'"}}'
+        echo "Repository dispatch triggered"
