@@ -82,8 +82,7 @@ jobs:
                   now = datetime.now(israel_tz)
                   parsed_time = datetime.strptime(time_str, "%I:%M %p")
                   schedule_time = now.replace(hour=parsed_time.hour, minute=parsed_time.minute, second=0, microsecond=0)
-                  if schedule_time < now:
-                      schedule_time += timedelta(days=1)
+
                   trigger_time = schedule_time - timedelta(minutes=int(minutes_before))
                   return schedule_time, trigger_time
               except ValueError as e:
@@ -116,7 +115,7 @@ jobs:
               echo "Current time has surpassed trigger time, breaking loop."
               break
             fi
-            sleep 60
+            sleep 1
           done
 
       - name: Trigger repository dispatch
